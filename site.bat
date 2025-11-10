@@ -608,9 +608,13 @@ start /b cmd /c "cd /d "%BACKEND_DIR%" && call "%STRAPI_CMD%" develop"
 
 echo Both servers are starting in the background...
 echo Press any key to return to the menu.
+echo.
+echo.
 pause >nul
 
 :: Kill all Node.js processes
+echo.
+echo.
 echo Stopping servers...
 taskkill /f /im node.exe >nul 2>&1
 
