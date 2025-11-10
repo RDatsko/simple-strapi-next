@@ -19,7 +19,7 @@ full_backup_items=(
 )
 
 # Complete backup (full + extras)
-full_backup_items=(
+complete_backup_items=(
   "./backend"
   "./frontend"
 )
