@@ -24,8 +24,8 @@ full_backup_items=(
   "./frontend"
 )
 
-NEXTJS_NODE_BIN="../node/mac/20.19.5/bin/node"
-STRAPI_NODE_BIN="../node/mac/18.20.8/bin/node"
+NEXTJS_NODE_BIN="/node/mac/20.19.5/bin/"
+STRAPI_NODE_BIN="/node/mac/18.20.8/bin/"
 
 # =====================================
 # Menu Configuration
@@ -38,6 +38,7 @@ main_menu_items=(
   "Site Operations:Test"
   "Site Operations:Build"
   "Site Operations:Run"
+  "Scripts:Create New Site"
   "Scripts:Install node_modules"
   "Scripts:Exit Script"
 )
@@ -266,8 +267,17 @@ while true; do
                 restore_menu
                 # After returning, reset main menu selector to Restore
                 selected=$restore_index
+            elif [[ "$section:$label" == "Scripts:Create New Site" ]]; then
+                echo "Creating a new site."
+                ".${STRAPI_NODE_BIN}npx" create-strapi-app@latest backend --no-run --quickstart
+                ".${STRAPI_NODE_BIN}npx" create-next-app@latest frontend --yes
+                sleep 5
             elif [[ "$section:$label" == "Scripts:Install node_modules" ]]; then
-                echo "npm install"
+                echo "Installing / Updating NodeJS node_modules"
+                cd ./backend && "..$STRAPI_NODE_BIN/npm" install
+                cd ..
+                cd ./frontend && "..$NEXTJS_NODE_BIN/npm" install
+                cd ..
                 sleep 5
             elif [[ "$section:$label" == "Scripts:Exit Script" ]]; then
                 clear
@@ -314,11 +324,11 @@ while true; do
 
                     # Run NextJS dev
                     echo "Starting NextJS dev server..."
-                    (cd ./frontend && "$NEXTJS_NODE_BIN" node_modules/.bin/next dev) &
+                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next dev) &
 
                     # Run Strapi dev
                     echo "Starting Strapi dev server..."
-                    (cd ./backend && "$STRAPI_NODE_BIN" node_modules/.bin/strapi develop) &
+                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi develop) &
 
                     echo
                     echo "Both development servers started. Use Ctrl+C to stop."
@@ -330,11 +340,11 @@ while true; do
 
                     # Build NextJS
                     echo "Building NextJS..."
-                    (cd ./frontend && "$NEXTJS_NODE_BIN" node_modules/.bin/next build)
+                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next build)
 
                     # Build Strapi
                     echo "Building Strapi..."
-                    (cd ./backend && "$STRAPI_NODE_BIN" node_modules/.bin/strapi build)
+                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi build)
 
                     echo
                     echo "Builds completed."
