@@ -1,2 +1,2 @@
-# simple-strpi-next
+# simple-strapi-next
 A Strapi and NextJS website designed to be simple to use and work with without getting lost.
