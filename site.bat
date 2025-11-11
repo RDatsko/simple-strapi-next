@@ -90,16 +90,41 @@ cursor_show="\033[?25h"
 # Draw a fancy section header
 # =====================================
 draw_section_header() {
-  local title="$1"
-  local padded_title=$(printf " %-24s" "$title")
-  local title_line="${title_bg_color}${title_fg_color}${padded_title}${reset_format}"
+  local title1="$1"
+  local title2="$2"
+  local padded_title1=$(printf " %-24s" "$title1")
+  local padded_title2=$(printf " %-24s" "$title2")
+  local title1_line="${title_bg_color}${title_fg_color}${padded_title1}${reset_format}"
+  local title2_line="${title_bg_color}${title_fg_color}${padded_title2}${reset_format}"
   echo
-  echo "$title_line"
+  echo "$title1_line        $title2_line"
+}
+
+draw_section_items() {
+  local title1="$1"
+  local title2="$3"
+  local padded_title1=$(printf " %-22s" "$title1")
+  local padded_title2=$(printf " %-22s" "$title2")
+  local title1_line="  ${gray_color}$padded_title1${reset_format}"
+  local title2_line="  ${gray_color}$padded_title2${reset_format}"
+  if (( $2 == selected )); then
+    title1_line="${arrow_color}>${reset_format} ${selected_color}$padded_title1${reset_format}"
+  else
+    title1_line="  ${gray_color}$padded_title1${reset_format}"
+  fi
+  if (( $4 == selected )); then
+    title2_line="${arrow_color}>${reset_format} ${selected_color}$padded_title2${reset_format}"
+  else
+    title2_line="  ${gray_color}$padded_title2${reset_format}"
+  fi
+  echo "$title1_line        $title2_line"
 }
 
 # =====================================
 # Draw the main menu
 # =====================================
+selected=1
+
 draw_menu() {
   clear
   echo "${selected_color}Please select an operation${reset_format}"
@@ -109,23 +134,17 @@ draw_menu() {
   echo -e "${selected_color}Complete${reset_format}: ${gray_color}backs up everything in the folders${reset_format}"
   echo
 
-  local current_section=""
-  for (( i=1; i<=${#main_menu_items[@]}; i++ )); do
-    local item="${main_menu_items[i]}"
-    local section="${item%%:*}"
-    local label="${item#*:}"
+  left_items=("Minimal" "Full" "Complete" "Select a restore file")
+  right_items=("Test" "Build" "Run" "Create New Site" "Install node_modules" "Exit Script")
 
-    if [[ "$section" != "$current_section" ]]; then
-      draw_section_header "$section"
-      current_section="$section"
-    fi
-
-    if (( i == selected )); then
-      echo "${arrow_color}>${reset_format} ${selected_color}$label${reset_format}"
-    else
-      echo "  ${gray_color}$label${reset_format}"
-    fi
-  done
+  draw_section_header "Backup"                    "Site Operations"
+  draw_section_items  "Minimal"  "1"              "Test"                 "5"
+  draw_section_items  "Full"     "2"              "Build"                "6"
+  draw_section_items  "Complete" "3"              "Run"                  "7"
+  draw_section_header "Restore"                   "Scripts"
+  draw_section_items  "Select a Restore File" "4" "Create New Site"      "8"
+  draw_section_items  ""                      "0" "Install mode_modules" "9"
+  draw_section_items  ""                      "0" "Exit Script"          "10"
 
   echo
   echo
@@ -288,34 +307,123 @@ while true; do
                 echo "${arrow_color}You selected:${reset_format} ${selected_color}$section → $label${reset_format}"
                 case "$section:$label" in
                   "Backup:Minimal")
-                    backup_file="backup__$(date +%Y-%m-%d__%H-%M)__minimal.zip"
-                    echo "Running minimal backup..."
-                    echo "Backup file will be: $backup_file"
+                    backup_file="backups/backup__$(date +%Y-%m-%d__%H-%M)__minimal.zip"
                     mkdir -p ./backups
-                    zip -r "backups/$backup_file" "${minimal_backup_items[@]}"
-                    echo "Minimal backup completed."
-                    sleep 5
+
+                    # Collect files
+                    files=("${minimal_backup_items[@]}")
+                    total=${#files[@]}
+                    if (( total == 0 )); then
+                        echo "No files found to back up!"
+                        sleep 2
+                        break
+                    fi
+
+                    count=0
+                    bar_length=25
+
+                    echo
+                    echo "Creating Minimal backup..."
+                    echo
+                    zip -q "$backup_file" >/dev/null 2>&1
+
+                    for f in "${files[@]}"; do
+                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+                      ((count++))
+                      percent=$((count * 100 / total))
+                      filled=$((percent * bar_length / 100))
+                      bar=$(printf "%${filled}s" | tr ' ' '█')
+                      empty=$(printf "%$((bar_length - filled))s" | tr ' ' '░')
+                      printf "\r%3d%%  %s%s" "$percent" "$bar" "$empty"
+                    done
+
+                    echo
+                    echo
+                    echo "✅ Minimal backup complete: $backup_file"
+                    sleep 2
                     ;;
                   "Backup:Full")
-                    backup_file="backup__$(date +%Y-%m-%d__%H-%M)__full.zip"
-                    echo "Running full backup..."
-                    echo "Backup file will be: $backup_file"
+                    backup_file="backups/backup__$(date +%Y-%m-%d__%H-%M)__full.zip"
                     mkdir -p ./backups
 
-                    zip -r "backups/$backup_file" "${full_backup_items[@]}" \
-                      -x "*/node_modules/*" \
-                      -x "*/public/*"
+                    # Collect files (excluding node_modules and public)
+                    files=()
+                    for item in "${full_backup_items[@]}"; do
+                        while IFS= read -r f; do
+                            files+=("$f")
+                        done < <(find "$item" -type f ! -path "*/node_modules/*" ! -path "*/public/*")
+                    done
 
-                    echo "Full backup completed."
-                    sleep 5
+                    total=${#files[@]}
+                    if (( total == 0 )); then
+                        echo "No files found to back up!"
+                        sleep 2
+                        break
+                    fi
+
+                    count=0
+                    bar_length=25
+
+                    echo
+                    echo "Creating Full backup..."
+                    echo
+                    zip -q "$backup_file" >/dev/null 2>&1
+
+                    for f in "${files[@]}"; do
+                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+                      ((count++))
+                      percent=$((count * 100 / total))
+                      filled=$((percent * bar_length / 100))
+                      bar=$(printf "%${filled}s" | tr ' ' '█')
+                      empty=$(printf "%$((bar_length - filled))s" | tr ' ' '░')
+                      printf "\r%3d%%  %s%s" "$percent" "$bar" "$empty"
+                    done
+
+                    echo
+                    echo
+                    echo "✅ Full backup complete: $backup_file"
+                    sleep 2
                     ;;
                   "Backup:Complete")
-                    backup_file="backup__$(date +%Y-%m-%d__%H-%M)__complete-mac.zip"
-                    echo "Running complete backup..."
-                    echo "Backup file will be: $backup_file"
-                    mkdir -p ./backups
-                    zip -r "backups/$backup_file" "${complete_backup_items[@]}"
-                    echo "Complete backup completed."
+                    backup_file="backups/backup__$(date +%Y-%m-%d__%H-%M)__complete-mac.zip"
+                    mkdir -p backups
+
+                    # Collect all files (excluding node_modules and .cache)
+                    files=( $(find ./backend ./frontend -type f ! -path "*/node_modules/*" ! -path "*/.cache/*") )
+                    total=${#files[@]}
+
+                    if (( total == 0 )); then
+                      echo "No files found to back up!"
+                      exit 1
+                    fi
+
+                    count=0
+                    bar_length=25  # Number of bar segments
+
+                    echo
+                    echo "Creating backup..."
+                    echo
+                    # Prepare empty zip (suppress all messages)
+                    zip -q "$backup_file" >/dev/null 2>&1
+
+                    for f in "${files[@]}"; do
+                      # Add file quietly, suppress all output
+                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+
+                      # Update progress
+                      ((count++))
+                      percent=$((count * 100 / total))
+                      filled=$((percent * bar_length / 100))
+
+                      bar=$(printf "%${filled}s" | tr ' ' '█')
+                      empty=$(printf "%$((bar_length - filled))s" | tr ' ' '░')
+
+                      printf "\r%3d%%  %s%s" "$percent" "$bar" "$empty"
+                    done
+
+                    echo
+                    echo
+                    echo "✅ Backup complete: $backup_file"
                     sleep 5
                     ;;
                   "Site Operations:Test")
