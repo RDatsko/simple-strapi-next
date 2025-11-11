@@ -130,7 +130,7 @@ draw_menu() {
   echo "${selected_color}Please select an operation${reset_format}"
   echo 
   echo -e "${selected_color}Minimal${reset_format} : ${gray_color}backs up only bare minimal 'package.json' and 'src/' folder${reset_format}"
-  echo -e "${selected_color}Full${reset_format}    : ${gray_color}backs up the entire folder except for the node_modules${reset_format}"
+  echo -e "${selected_color}Full${reset_format}    : ${gray_color}backs up the entire folder (except node_modules & public folders)${reset_format}"
   echo -e "${selected_color}Complete${reset_format}: ${gray_color}backs up everything in the folders (Long backup: 1+ hr)${reset_format}"
   echo
 
