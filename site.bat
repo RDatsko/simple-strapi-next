@@ -35,7 +35,7 @@ main_menu_items=(
   "Backup:Full"
   "Backup:Complete"
   "Restore:Select a restore file"
-  "Site Operations:Test"
+  "Site Operations:Development"
   "Site Operations:Build"
   "Site Operations:Run"
   "Scripts:Create New Site"
@@ -131,15 +131,12 @@ draw_menu() {
   echo 
   echo -e "${selected_color}Minimal${reset_format} : ${gray_color}backs up only bare minimal 'package.json' and 'src/' folder${reset_format}"
   echo -e "${selected_color}Full${reset_format}    : ${gray_color}backs up the entire folder except for the node_modules${reset_format}"
-  echo -e "${selected_color}Complete${reset_format}: ${gray_color}backs up everything in the folders${reset_format}"
+  echo -e "${selected_color}Complete${reset_format}: ${gray_color}backs up everything in the folders (Long backup: 1+ hr)${reset_format}"
   echo
 
-  left_items=("Minimal" "Full" "Complete" "Select a restore file")
-  right_items=("Test" "Build" "Run" "Create New Site" "Install node_modules" "Exit Script")
-
   draw_section_header "Backup"                    "Site Operations"
-  draw_section_items  "Minimal"  "1"              "Test"                 "5"
-  draw_section_items  "Full"     "2"              "Build"                "6"
+  draw_section_items  "Minimal"  "1"              "Development"          "5"
+  draw_section_items  "Full"     "2"              "Build for Production" "6"
   draw_section_items  "Complete" "3"              "Run"                  "7"
   draw_section_header "Restore"                   "Scripts"
   draw_section_items  "Select a Restore File" "4" "Create New Site"      "8"
@@ -162,6 +159,8 @@ read_key() {
     case "$rest" in
       "[A") echo "up" ;;
       "[B") echo "down" ;;
+      "[C") echo "right" ;;
+      "[D") echo "left" ;;
       *) echo "" ;;
     esac
   elif [[ $key == "" ]]; then
@@ -327,6 +326,36 @@ while true; do
             ((selected++))
             ((selected > ${#main_menu_items[@]})) && selected=1
             ;;
+        left)
+            case $selected in
+              1) selected=5 ;;
+              2) selected=6 ;;
+              3) selected=7 ;;
+              4) selected=8 ;;
+              5) selected=1 ;;
+              6) selected=2 ;;
+              7) selected=3 ;;
+              8) selected=4 ;;
+              9) selected=4 ;;
+              10) selected=4 ;;
+              *) selected=$selected ;;  # default, no change
+            esac
+            ;;
+        right)
+            case $selected in
+              1) selected=5 ;;
+              2) selected=6 ;;
+              3) selected=7 ;;
+              4) selected=8 ;;
+              5) selected=1 ;;
+              6) selected=2 ;;
+              7) selected=3 ;;
+              8) selected=4 ;;
+              9) selected=4 ;;
+              10) selected=4 ;;
+              *) selected=$selected ;;
+            esac
+            ;;
         enter)
             choice="${main_menu_items[selected]}"
             section="${choice%%:*}"
@@ -412,7 +441,7 @@ while true; do
                     fi
 
                     count=0
-                    bar_length=25
+                    bar_length=50
 
                     echo
                     echo "Creating Full backup..."
@@ -448,7 +477,7 @@ while true; do
                     fi
 
                     count=0
-                    bar_length=25  # Number of bar segments
+                    bar_length=50  # Number of bar segments
 
                     echo
                     echo "Creating backup..."
@@ -476,7 +505,7 @@ while true; do
                     echo "✅ Backup complete: $backup_file"
                     sleep 5
                     ;;
-                  "Site Operations:Test")
+                  "Site Operations:Development")
                     echo "Running NextJS and Strapi in development mode..."
                     echo
 
@@ -654,7 +683,7 @@ echo !title_bg_color!!title_fg_color! Restore            !reset!
 echo !arrow_color!  4.!reset! !gray_color!Minimal!reset!
 echo.
 echo !title_bg_color!!title_fg_color! Site Operations    !reset!
-echo !arrow_color!  5.!reset! !gray_color!Test!reset!
+echo !arrow_color!  5.!reset! !gray_color!Development!reset!
 echo !arrow_color!  6.!reset! !gray_color!Build!reset!
 echo !arrow_color!  7.!reset! !gray_color!Run!reset!
 echo.
@@ -669,7 +698,7 @@ if "%choice%"=="1" call :backup minimal
 if "%choice%"=="2" call :backup full
 if "%choice%"=="3" call :backup complete-win
 if "%choice%"=="4" call :restore
-if "%choice%"=="5" call :test
+if "%choice%"=="5" call :development
 if "%choice%"=="6" call :build
 if "%choice%"=="7" call :run
 if "%choice%"=="8" call :update
@@ -768,7 +797,7 @@ timeout /t 5 >nul
 cls
 exit /b
 
-:test
+:development
 cls
 :: kill all running node tasks in case they weren't closed properly
 taskkill /f /im node.exe >nul 2>&1
