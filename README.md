@@ -10,4 +10,9 @@ Also, rather than have multiple folders, all the "folders" are structured in the
 ```
 export const page="/###";
 ```
+## The site.bat script
+This script is a polyglot zshell/batch script so it can be run from either zshell on Linus/macOS or from the Command Prompt in Windows.
 
+It runs node from the node folder to allow you to make sure that you have the same version of node as what you may be using on your server.
+
+This ensures compatibility between the testing environment and the production environment.
