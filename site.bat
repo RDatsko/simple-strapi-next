@@ -508,7 +508,19 @@ while true; do
                     echo "Builds completed."
                     ;;
                   "Site Operations:Run")
-                    echo "Running site..."
+                    echo "Running NextJS and Strapi in development mode..."
+                    echo
+
+                    # Running NextJS Server
+                    echo "Starting NextJS server..."
+                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next start)
+
+                    # Running Strapi Server
+                    echo "Starting Strapi server..."
+                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi start)
+
+                    echo
+                    echo "Builds completed."
                     ;;
                 esac
                 echo
