@@ -525,16 +525,18 @@ while true; do
                     echo "Building NextJS and Strapi for production..."
                     echo
 
-                    # Build NextJS
-                    echo "Building NextJS..."
-                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next build)
-
                     # Build Strapi
                     echo "Building Strapi..."
                     (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi build)
 
+                    # Build NextJS
+                    echo "Building NextJS..."
+                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next build)
+
                     echo
-                    echo "Builds completed."
+                    echo
+                    echo "Press any key to continue..."
+                    read -s -k # Waits for a single key press without echoing it
                     ;;
                   "Site Operations:Run")
                     echo "Running NextJS and Strapi in development mode..."
@@ -547,9 +549,6 @@ while true; do
                     # Running Strapi Server
                     echo "Starting Strapi server..."
                     (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi start)
-
-                    echo
-                    echo "Builds completed."
                     ;;
                 esac
                 echo
