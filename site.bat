@@ -189,7 +189,13 @@ restore_menu() {
 
   draw_restore_menu() {
     clear
-    draw_section_header "Restore"
+    # draw_section_header "Restore"
+    local title="$1"
+    local padded_title=$(printf " %-49s" "Restore")
+    local title_line="${title_bg_color}${title_fg_color}${padded_title}${reset_format}"
+    echo
+    echo "$title_line"
+
     for (( i=1; i<=${#backup_files[@]}; i++ )); do
       local file="${backup_files[i]}"
       local file_name=$(basename "$file")
@@ -229,25 +235,69 @@ restore_menu() {
   clear
 
   if [[ -n "$selected_file" ]]; then
-      echo "${arrow_color}You selected backup:${reset_format} ${selected_color}$selected_file${reset_format}"
+    echo "${arrow_color}You selected backup:${reset_format} ${selected_color}$selected_file${reset_format}"
+    echo
+    read -q "confirm?This will delete existing minimal backup files and restore them. Proceed? (y/N) "
+    echo
+    echo
+    if [[ "$confirm" == [Yy] ]]; then
       echo
-      read -q "confirm?This will delete existing minimal backup files and restore them. Proceed? (y/N) "
+      echo "Cleaning up existing files..."
       echo
-      if [[ "$confirm" == [Yy] ]]; then
-          echo "Cleaning up existing files..."
-          for item in "${minimal_backup_items[@]}"; do
-              if [[ -e "$item" ]]; then
-                  rm -rf "$item"
-              fi
+      if [[ "$selected_file" == *"minimal"* ]]; then
+        for item in "${minimal_backup_items[@]}"; do
+            [[ -e "$item" ]] && rm -rf "$item"
+        done
+      elif [[ "$selected_file" == *"full"* ]]; then
+        for dir in ./backend ./frontend; do
+            if [[ -d "$dir" ]]; then
+                # Remove all files and directories except node_modules and public
+                find "$dir" -mindepth 1 \
+                    ! -path "*/node_modules*" \
+                    ! -path "*/public*" \
+                    -exec rm -rf {} +
+            fi
+        done
+      elif [[ "$selected_file" == *"complete"* ]]; then
+          for dir in ./backend ./frontend; do
+            if [[ -d "$dir" ]]; then
+              find "$dir" -mindepth 1 -print0 | xargs -0 rm -rf
+            fi
           done
-          echo "Restoring files from backup..."
-          unzip -o "$selected_file"
-          echo "Restore completed."
       else
-          echo "Restore canceled."
+        backup_type="Unknown"
       fi
+
+      echo "Restoring files from backup..."
       echo
-      sleep 2
+      # Get all files in the zip
+      files=()
+      while IFS= read -r line; do
+          files+=("$line")
+      done < <(unzip -Z1 "$selected_file")
+
+      total=${#files[@]}
+      count=0
+      bar_length=50
+
+      # Extract each file individually with progress bar
+      for f in "${files[@]}"; do
+          unzip -oq "$selected_file" "$f" >/dev/null 2>&1
+          ((count++))
+          percent=$((count * 100 / total))
+          filled=$((percent * bar_length / 100))
+          bar=$(printf "%${filled}s" | tr ' ' '█')
+          empty=$(printf "%$((bar_length - filled))s" | tr ' ' '░')
+          printf "\r%3d%%  %s%s" "$percent" "$bar" "$empty"
+      done
+      echo
+      echo
+      echo "✅ Restore complete."
+    else
+      echo "Restore canceled."
+    fi
+    echo
+    sleep 2
   fi
 }
 
@@ -320,7 +370,7 @@ while true; do
                     fi
 
                     count=0
-                    bar_length=25
+                    bar_length=50
 
                     echo
                     echo "Creating Minimal backup..."
