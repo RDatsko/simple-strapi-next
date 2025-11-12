@@ -2,6 +2,9 @@
 @echo off & GOTO Windows
 clear
 
+NEXTJS_NODE_VER="20.19.5"
+STRAPI_NODE_VER="18.20.8"
+
 # =====================================
 # Files/folders for backups
 # =====================================
@@ -23,9 +26,6 @@ complete_backup_items=(
   "./backend"
   "./frontend"
 )
-
-NEXTJS_NODE_BIN="/node/mac/20.19.5/bin/"
-STRAPI_NODE_BIN="/node/mac/18.20.8/bin/"
 
 # =====================================
 # Menu Configuration
@@ -269,19 +269,29 @@ restore_menu() {
 
       echo "Restoring files from backup..."
       echo
-      # Get all files in the zip
-      files=()
+
+      bar_length=50
+      count=0
+
+      # Read each filename literally, preserving spaces
+      zip_files=()
       while IFS= read -r line; do
-          files+=("$line")
+          zip_files+=("$line")
       done < <(unzip -Z1 "$selected_file")
 
-      total=${#files[@]}
-      count=0
-      bar_length=50
+      total=${#zip_files[@]}
 
-      # Extract each file individually with progress bar
-      for f in "${files[@]}"; do
-          unzip -oq "$selected_file" "$f" >/dev/null 2>&1
+      for f in "${zip_files[@]}"; do
+          [[ -z "$f" ]] && continue
+
+          mkdir -p "$(dirname "$f")"
+
+          # Escape special characters for literal match
+          literal_f="${f//\[/\\[}"
+          literal_f="${literal_f//\]/\\]}"
+
+          unzip -qq "$selected_file" "$literal_f" -d .
+
           ((count++))
           percent=$((count * 100 / total))
           filled=$((percent * bar_length / 100))
@@ -289,6 +299,7 @@ restore_menu() {
           empty=$(printf "%$((bar_length - filled))s" | tr ' ' '░')
           printf "\r%3d%%  %s%s" "$percent" "$bar" "$empty"
       done
+
       echo
       echo
       echo "✅ Restore complete."
@@ -367,14 +378,14 @@ while true; do
                 selected=$restore_index
             elif [[ "$section:$label" == "Scripts:Create New Site" ]]; then
                 echo "Creating a new site."
-                ".${STRAPI_NODE_BIN}npx" create-strapi-app@latest backend --no-run --quickstart
-                ".${STRAPI_NODE_BIN}npx" create-next-app@latest frontend --yes
+                "./node/mac/${STRAPI_NODE_VER}/bin/npx" create-strapi-app@latest backend --no-run --quickstart
+                "./node/mac/${NEXTJS_NODE_VER}/bin/npx" create-next-app@latest frontend --yes
                 sleep 5
             elif [[ "$section:$label" == "Scripts:Install node_modules" ]]; then
                 echo "Installing / Updating NodeJS node_modules"
-                cd ./backend && "..$STRAPI_NODE_BIN/npm" install
+                cd ./backend && "../node/mac/$STRAPI_NODE_VER/bin/npm" install
                 cd ..
-                cd ./frontend && "..$NEXTJS_NODE_BIN/npm" install
+                cd ./frontend && "../node/mac/$NEXTJS_NODE_VER/bin/npm" install
                 cd ..
                 sleep 5
             elif [[ "$section:$label" == "Scripts:Exit Script" ]]; then
@@ -404,10 +415,10 @@ while true; do
                     echo
                     echo "Creating Minimal backup..."
                     echo
-                    zip -q "$backup_file" >/dev/null 2>&1
+                    zip -qr "$backup_file" >/dev/null 2>&1
 
                     for f in "${files[@]}"; do
-                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+                      zip -qr "$backup_file" "$f" >/dev/null 2>&1
                       ((count++))
                       percent=$((count * 100 / total))
                       filled=$((percent * bar_length / 100))
@@ -427,7 +438,7 @@ while true; do
 
                     # Collect files (excluding node_modules and public)
                     files=()
-                    for item in "${full_backup_items[@]}"; do
+                    for item in "${complete_backup_items[@]}"; do
                         while IFS= read -r f; do
                             files+=("$f")
                         done < <(find "$item" -type f ! -path "*/node_modules/*" ! -path "*/public/*")
@@ -446,10 +457,10 @@ while true; do
                     echo
                     echo "Creating Full backup..."
                     echo
-                    zip -q "$backup_file" >/dev/null 2>&1
+                    zip -qr "$backup_file" >/dev/null 2>&1
 
                     for f in "${files[@]}"; do
-                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+                      zip -qr "$backup_file" "$f" >/dev/null 2>&1
                       ((count++))
                       percent=$((count * 100 / total))
                       filled=$((percent * bar_length / 100))
@@ -468,7 +479,7 @@ while true; do
                     mkdir -p backups
 
                     # Collect all files (excluding node_modules and .cache)
-                    files=( $(find ./backend ./frontend -type f ! -path "*/node_modules/*" ! -path "*/.cache/*") )
+                    files=( $(find ./backend ./frontend -type f) )
                     total=${#files[@]}
 
                     if (( total == 0 )); then
@@ -483,11 +494,11 @@ while true; do
                     echo "Creating backup..."
                     echo
                     # Prepare empty zip (suppress all messages)
-                    zip -q "$backup_file" >/dev/null 2>&1
+                    zip -qr "$backup_file" >/dev/null 2>&1
 
                     for f in "${files[@]}"; do
                       # Add file quietly, suppress all output
-                      zip -q "$backup_file" "$f" >/dev/null 2>&1
+                      zip -qr "$backup_file" "$f" >/dev/null 2>&1
 
                       # Update progress
                       ((count++))
@@ -511,11 +522,11 @@ while true; do
 
                     # Run NextJS dev
                     echo "Starting NextJS dev server..."
-                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next dev) &
+                    (cd ./frontend && "../node/mac/$NEXTJS_NODE_VER/bin/node" node_modules/.bin/next dev) &
 
                     # Run Strapi dev
                     echo "Starting Strapi dev server..."
-                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi develop) &
+                    (cd ./backend && "../node/mac/$STRAPI_NODE_VER/bin/node" node_modules/.bin/strapi develop) &
 
                     echo
                     echo "Both development servers started. Use Ctrl+C to stop."
@@ -527,11 +538,11 @@ while true; do
 
                     # Build Strapi
                     echo "Building Strapi..."
-                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi build)
+                    (cd ./backend && "../node/mac/$STRAPI_NODE_VER/bin/node" node_modules/.bin/strapi build)
 
                     # Build NextJS
                     echo "Building NextJS..."
-                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next build)
+                    (cd ./frontend && "../node/mac/$NEXTJS_NODE_VER/bin/node" node_modules/.bin/next build)
 
                     echo
                     echo
@@ -544,11 +555,11 @@ while true; do
 
                     # Running NextJS Server
                     echo "Starting NextJS server..."
-                    (cd ./frontend && "..$NEXTJS_NODE_BIN/node" node_modules/.bin/next start)
+                    (cd ./frontend && "../node/mac/$NEXTJS_NODE_VER/bin/node" node_modules/.bin/next start)
 
                     # Running Strapi Server
                     echo "Starting Strapi server..."
-                    (cd ./backend && "..$STRAPI_NODE_BIN/node" node_modules/.bin/strapi start)
+                    (cd ./backend && "../node/mac/$STRAPI_NODE_VER/bin/node" node_modules/.bin/strapi start)
                     ;;
                 esac
                 echo
@@ -610,6 +621,9 @@ exit 0
 
 :Windows
 cd /D "%~dp0"
+
+set "NEXTJS_NODE_VER=20.19.5"
+set "STRAPI_NODE_VER=18.20.8"
 cls
 
 setlocal enabledelayedexpansion
@@ -669,26 +683,19 @@ exit /b
 echo %selected_color%Please select an operation%reset%
 echo.
 echo %selected_color%Minimal%reset% : %gray_color%backs up only bare minimal 'package.json' and 'src/' folder%reset%
-echo %selected_color%Full%reset%    : %gray_color%backs up the entire folder except for the node_modules%reset%
-echo %selected_color%Complete%reset%: %gray_color%backs up everything in the folders%reset%
+echo %selected_color%Full%reset%    : %gray_color%backs up the entire folder  (except node_modules and public folders)"%reset%
+echo %selected_color%Complete%reset%: %gray_color%backs up everything in the folders (Long backup: 1+ hr)%reset%
 echo.
 echo.
-echo !title_bg_color!!title_fg_color! Backup             !reset!
-echo !arrow_color!  1.!reset! !gray_color!Minimal!reset!
-echo !arrow_color!  2.!reset! !gray_color!Full!reset!
-echo !arrow_color!  3.!reset! !gray_color!Complete!reset!
+echo !title_bg_color!!title_fg_color! Backup             !reset!        !title_bg_color!!title_fg_color! Site Operations    !reset!
+echo !arrow_color!  1.!reset! !gray_color!Minimal!reset!                !arrow_color!  5.!reset! !gray_color!Development!reset!
+echo !arrow_color!  2.!reset! !gray_color!Full!reset!                   !arrow_color!  6.!reset! !gray_color!Build for Production!reset!
+echo !arrow_color!  3.!reset! !gray_color!Complete!reset!               !arrow_color!  7.!reset! !gray_color!Run!reset!
 echo.
-echo !title_bg_color!!title_fg_color! Restore            !reset!
-echo !arrow_color!  4.!reset! !gray_color!Minimal!reset!
-echo.
-echo !title_bg_color!!title_fg_color! Site Operations    !reset!
-echo !arrow_color!  5.!reset! !gray_color!Development!reset!
-echo !arrow_color!  6.!reset! !gray_color!Build!reset!
-echo !arrow_color!  7.!reset! !gray_color!Run!reset!
-echo.
-echo !title_bg_color!!title_fg_color! Scripts            !reset!
-echo !arrow_color!  8.!reset! !gray_color!Install node_modules!reset!
-echo !arrow_color!  9.!reset! !gray_color!Exit Script!reset!
+echo !title_bg_color!!title_fg_color! Restore            !reset!        !title_bg_color!!title_fg_color! Scripts            !reset!
+echo !arrow_color!  4.!reset! !gray_color!Minimal!reset!                !arrow_color!  8.!reset! !gray_color!Create New Site!reset!
+echo                             !arrow_color!  9.!reset! !gray_color!Install mode_modules!reset!
+echo                             !arrow_color!  0.!reset! !gray_color!Exit Script!reset!
 echo.
 echo.
 set /p choice="!selected_color!Select option number:!reset! "
@@ -700,8 +707,9 @@ if "%choice%"=="4" call :restore
 if "%choice%"=="5" call :development
 if "%choice%"=="6" call :build
 if "%choice%"=="7" call :run
-if "%choice%"=="8" call :update
-if "%choice%"=="9" exit /b
+if "%choice%"=="8" call :create
+if "%choice%"=="9" call :update
+if "%choice%"=="0" exit /b
 set "choice="
 cls
 goto :menu_start
@@ -717,35 +725,100 @@ set "timestamp=%timestamp: =0%"
 set "backup_file=%BACKUP_DIR%\backup__%timestamp%__%type%.zip"
 
 echo %arrow_color%Running %type% backup...%reset%
-@REM if "%type%"=="minimal" powershell -Command "Compress-Archive -Path 'backend\src','backend\package.json','frontend\src','frontend\package.json' -DestinationPath '%backup_file%' -Force"
-if "%type%"=="minimal" powershell -NoProfile -Command ^
+echo.
+if "%type%"=="minimal" (
+powershell -NoProfile -Command ^
   "$Zip='%backup_file%'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " ^
   "if (Test-Path $Zip) { Remove-Item $Zip }; " ^
-  "$zipObj=[System.IO.Compression.ZipFile]::Open($Zip,'Create'); " ^
-  "[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj,'backend\package.json','backend/package.json'); " ^
-  "[System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj,'frontend\package.json','frontend/package.json'); " ^
-  "$backendSrc=(Get-ChildItem -Recurse 'backend\src'); " ^
-  "foreach($f in $backendSrc){if(-not $f.PSIsContainer){$rel=$f.FullName.Substring((Resolve-Path 'backend').Path.Length+1); [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj,$f.FullName,'backend/'+$rel)}}; " ^
-  "$frontendSrc=(Get-ChildItem -Recurse 'frontend\src'); " ^
-  "foreach($f in $frontendSrc){if(-not $f.PSIsContainer){$rel=$f.FullName.Substring((Resolve-Path 'frontend').Path.Length+1); [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj,$f.FullName,'frontend/'+$rel)}}; " ^
-  "$zipObj.Dispose()"
-if "%type%"=="full" powershell -NoProfile -Command ^
-  "$Zip='%backup_file%'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " ^
-  "if (Test-Path $Zip) { Remove-Item $Zip }; " ^
-  "$zipObj=[System.IO.Compression.ZipFile]::Open($Zip,'Create'); " ^
-  "foreach($root in @('backend','frontend')) { " ^
-  "  $items = Get-ChildItem -Recurse -Force $root | Where-Object { $_.FullName -notmatch '\\node_modules(\\|$)' }; " ^
-  "  foreach($item in $items) { " ^
-  "    $rel = $item.FullName.Substring((Resolve-Path $root).Path.Length+1); " ^
-  "    if ($item.PSIsContainer) { " ^
-  "      $null = $zipObj.CreateEntry($root + '/' + $rel.TrimEnd('\') + '/'); " ^
-  "    } else { " ^
-  "      [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj, $item.FullName, $root + '/' + $rel) " ^
-  "    } " ^
-  "  } " ^
+  "$backendBase = (Resolve-Path 'backend').Path; " ^
+  "$frontendBase = (Resolve-Path 'frontend').Path; " ^
+  "$backendFiles = Get-ChildItem -Recurse 'backend\src' -File; " ^
+  "$frontendFiles = Get-ChildItem -Recurse 'frontend\src' -File; " ^
+  "$extraFiles = @(Get-Item 'backend\package.json', 'frontend\package.json'); " ^
+  "$fullFiles = $backendFiles + $frontendFiles + $extraFiles; " ^
+  "$total = $fullFiles.Count; $i = 0; " ^
+  "$zipObj = [System.IO.Compression.ZipFile]::Open($Zip, 'Create'); " ^
+  "foreach ($f in $fullFiles) { " ^
+  "  if ($f.FullName.StartsWith($backendBase)) { $base = $backendBase; $prefix = 'backend/'; } " ^
+  "  elseif ($f.FullName.StartsWith($frontendBase)) { $base = $frontendBase; $prefix = 'frontend/'; } " ^
+  "  else { continue }; " ^
+  "  $rel = $f.FullName.Substring($base.Length + 1) -replace '\\','/'; " ^
+  "  [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj, $f.FullName, $prefix + $rel) | Out-Null; " ^
+  "  $i++; " ^
+  "  $pct = [math]::Floor(($i / $total) * 100); " ^
+  "  $filledCount = [math]::Floor($pct / 2); " ^
+  "  $emptyCount = 50 - $filledCount; " ^
+  "  $empty = '░' * $emptyCount; " ^
+  "  $filled = '█' * $filledCount; " ^
+  "  $pos = $host.UI.RawUI.CursorPosition; $pos.X = 0; $host.UI.RawUI.CursorPosition = $pos; " ^
+  "  Write-Host -NoNewline ('{0,3}%% {1}' -f $pct, ($filled + $empty)); " ^
   "} " ^
-  "$zipObj.Dispose()"
-if "%type%"=="complete" powershell -Command "Compress-Archive -Path 'backend','frontend' -DestinationPath '%backup_file%' -Force"
+  "$zipObj.Dispose(); "
+)
+if "%type%"=="full" (
+powershell -NoProfile -Command ^
+  "$Zip='%backup_file%'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " ^
+  "if (Test-Path $Zip) { Remove-Item $Zip }; " ^
+  "$backendBase = (Resolve-Path 'backend').Path; " ^
+  "$frontendBase = (Resolve-Path 'frontend').Path; " ^
+  "$backendFiles = Get-ChildItem -Recurse 'backend' -File | Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.FullName -notmatch '\\public\\' }; " ^
+  "$frontendFiles = Get-ChildItem -Recurse 'frontend' -File | Where-Object { $_.FullName -notmatch '\\node_modules\\' -and $_.FullName -notmatch '\\public\\' }; " ^
+  "$fullFiles = $backendFiles + $frontendFiles; " ^
+  "$total = $fullFiles.Count; $i = 0; " ^
+  "$zipObj = [System.IO.Compression.ZipFile]::Open($Zip, 'Create'); " ^
+  "foreach ($f in $fullFiles) { " ^
+  "  if ($f.FullName.StartsWith($backendBase)) { $base = $backendBase; $prefix = 'backend/'; } " ^
+  "  elseif ($f.FullName.StartsWith($frontendBase)) { $base = $frontendBase; $prefix = 'frontend/'; } " ^
+  "  else { continue }; " ^
+  "  $rel = $f.FullName.Substring($base.Length + 1) -replace '\\','/'; " ^
+  "  [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj, $f.FullName, $prefix + $rel) | Out-Null; " ^
+  "  $i++; " ^
+  "  $pct = [math]::Floor(($i / $total) * 100); " ^
+  "  $filledCount = [math]::Floor($pct / 2); " ^
+  "  $emptyCount = 50 - $filledCount; " ^
+  "  $empty = '░' * $emptyCount; " ^
+  "  $filled = '█' * $filledCount; " ^
+  "  $pos = $host.UI.RawUI.CursorPosition; $pos.X = 0; $host.UI.RawUI.CursorPosition = $pos; " ^
+  "  Write-Host -NoNewline ('{0,3}%% {1}' -f $pct, ($filled + $empty)); " ^
+  "} " ^
+  "$zipObj.Dispose(); "
+)
+@REM if "%type%"=="complete-win" powershell -Command "Compress-Archive -Path 'backend','frontend' -DestinationPath '%backup_file%' -Force"
+if "%type%"=="complete-win" (
+    echo.
+    echo Backing up everything... Please wait.
+    echo.
+
+powershell -NoProfile -Command ^
+  "$Zip='%backup_file%'; Add-Type -AssemblyName System.IO.Compression.FileSystem; " ^
+  "if (Test-Path $Zip) { Remove-Item $Zip }; " ^
+  "$backendBase = (Resolve-Path 'backend').Path; " ^
+  "$frontendBase = (Resolve-Path 'frontend').Path; " ^
+  "$backendFiles = Get-ChildItem -Recurse 'backend' -File; " ^
+  "$frontendFiles = Get-ChildItem -Recurse 'frontend' -File; " ^
+  "$fullFiles = $backendFiles + $frontendFiles; " ^
+  "$total = $fullFiles.Count; $i = 0; " ^
+  "$zipObj = [System.IO.Compression.ZipFile]::Open($Zip, 'Create'); " ^
+  "foreach ($f in $fullFiles) { " ^
+  "  if ($f.FullName.StartsWith($backendBase)) { $base = $backendBase; $prefix = 'backend/'; } " ^
+  "  elseif ($f.FullName.StartsWith($frontendBase)) { $base = $frontendBase; $prefix = 'frontend/'; } " ^
+  "  else { continue }; " ^
+  "  $rel = $f.FullName.Substring($base.Length + 1) -replace '\\','/'; " ^
+  "  [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zipObj, $f.FullName, $prefix + $rel) | Out-Null; " ^
+  "  $i++; " ^
+  "  $pct = [math]::Floor(($i / $total) * 100); " ^
+  "  $filledCount = [math]::Floor($pct / 2); " ^
+  "  $emptyCount = 50 - $filledCount; " ^
+  "  $empty = '░' * $emptyCount; " ^
+  "  $filled = '█' * $filledCount; " ^
+  "  $pos = $host.UI.RawUI.CursorPosition; $pos.X = 0; $host.UI.RawUI.CursorPosition = $pos; " ^
+  "  Write-Host -NoNewline ('{0,3}%% {1}' -f $pct, ($filled + $empty)); " ^
+  "} " ^
+  "$zipObj.Dispose(); "
+)
+
+echo.
+echo.
 echo %success_color%Backup complete:%reset% %backup_file%
 timeout /t 3 >nul
 exit /b
@@ -805,14 +878,14 @@ echo Running NextJS and Strapi in development mode in the same window...
 echo.
 
 :: Paths
-set "FRONTEND_DIR=%~dp0frontend"
-set "BACKEND_DIR=%~dp0backend"
-set "NEXTJS_CMD=%FRONTEND_DIR%\node_modules\.bin\next.cmd"
-set "STRAPI_CMD=%BACKEND_DIR%\node_modules\.bin\strapi.cmd"
+set "ROOT_DIR=%~dp0"
+set "FRONTEND_DIR=%ROOT_DIR%frontend"
+set "BACKEND_DIR=%ROOT_DIR%backend"
+set "NODE_DIR=%ROOT_DIR%node\win"
 
 :: Run both in background within the same window
-start /b cmd /c "cd /d "%FRONTEND_DIR%" && call "%NEXTJS_CMD%" dev"
-start /b cmd /c "cd /d "%BACKEND_DIR%" && call "%STRAPI_CMD%" develop"
+start /b cmd /c "cd /d "%FRONTEND_DIR%" && call "%NODE_DIR%\%NEXTJS_NODE_VER%\node.exe" node_modules\next\dist\bin\next dev"
+start /b cmd /c "cd /d "%BACKEND_DIR%"  && call "%NODE_DIR%\%STRAPI_NODE_VER%\node.exe" node_modules\@strapi\strapi\bin\strapi.js develop"
 
 echo Both servers are starting in the background...
 echo Press any key to return to the menu.
@@ -831,13 +904,98 @@ timeout /t 5 >nul
 exit /b
 
 :build
-echo "bild"
-exit /b
+cls
+:: kill all running node tasks in case they weren't closed properly
+taskkill /f /im node.exe >nul 2>&1
 
-:update
-echo "npm install"
+echo Running NextJS and Strapi in development mode in the same window...
+echo.
+
+:: Paths
+set "ROOT_DIR=%~dp0"
+set "FRONTEND_DIR=%ROOT_DIR%frontend"
+set "BACKEND_DIR=%ROOT_DIR%backend"
+set "NODE_DIR=%ROOT_DIR%node\win"
+
+:: Run both in background within the same window
+start /b cmd /c "cd /d "%BACKEND_DIR%"  && call "%NODE_DIR%\%STRAPI_NODE_VER%\node.exe" node_modules\@strapi\strapi\bin\strapi.js build"
+start /b cmd /c "cd /d "%FRONTEND_DIR%" && call "%NODE_DIR%\%NEXTJS_NODE_VER%\node.exe" node_modules\next\dist\bin\next build"
+
+:: Kill all Node.js processes in case of node hang
+echo.
+echo.
+taskkill /f /im node.exe >nul 2>&1
+
+echo Press any key to return to the menu.
+echo.
+echo.
+pause >nul
+
 exit /b
 
 :run
-echo "run"
+cls
+:: kill all running node tasks in case they weren't closed properly
+taskkill /f /im node.exe >nul 2>&1
+
+echo Running NextJS and Strapi in production mode in the same window...
+echo.
+
+:: Paths
+set "ROOT_DIR=%~dp0"
+set "FRONTEND_DIR=%ROOT_DIR%frontend"
+set "BACKEND_DIR=%ROOT_DIR%backend"
+set "NODE_DIR=%ROOT_DIR%node\win"
+
+:: Run both in background within the same window
+start /b cmd /c "cd /d "%FRONTEND_DIR%" && call "%NODE_DIR%\%NEXTJS_NODE_VER%\node.exe" node_modules\next\dist\bin\next build"
+start /b cmd /c "cd /d "%BACKEND_DIR%"  && call "%NODE_DIR%\%STRAPI_NODE_VER%\node.exe" node_modules\@strapi\strapi\bin\strapi.js build"
+
+echo Both servers are starting in the background...
+echo Press any key to return to the menu.
+echo.
+echo.
+pause >nul
+
+:: Kill all Node.js processes
+echo.
+echo.
+echo Stopping servers...
+taskkill /f /im node.exe >nul 2>&1
+
+echo Servers stopped.
+timeout /t 5 >nul
+exit /b
+
+:create
+echo "create site"
+exit /b
+
+:update
+cls
+:: kill all running node tasks in case they weren't closed properly
+taskkill /f /im node.exe >nul 2>&1
+
+echo Running npm install...
+echo.
+
+:: Paths
+set "ROOT_DIR=%~dp0"
+set "FRONTEND_DIR=%ROOT_DIR%frontend"
+set "BACKEND_DIR=%ROOT_DIR%backend"
+set "NODE_DIR=%ROOT_DIR%node\win"
+
+:: Run both in background within the same window
+start /b cmd /c "cd /d "%BACKEND_DIR%"  && call "%NODE_DIR%\%STRAPI_NODE_VER%\npm.cmd" install"
+start /b cmd /c "cd /d "%FRONTEND_DIR%" && call "%NODE_DIR%\%NEXTJS_NODE_VER%\npm.cmd" install"
+
+:: Kill all Node.js processes in case of node hang
+echo.
+echo.
+taskkill /f /im node.exe >nul 2>&1
+
+echo "Please wait for the normal cursor to appear then press any key to continue..."
+echo.
+echo.
+pause >nul
 exit /b
